@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { validateToken, syncAssignments } from '../services/api';
 
-const TokenModal = ({ isOpen, onClose, onTokenValidated, darkMode }) => {
+const TokenModal = ({ isOpen, onClose, onTokenValidated, onDisconnect, darkMode }) => {
   const [canvasUrl, setCanvasUrl] = useState('https://canvas.instructure.com');
   const [canvasToken, setCanvasToken] = useState('');
   const [loading, setLoading] = useState(false);
@@ -106,6 +106,25 @@ const TokenModal = ({ isOpen, onClose, onTokenValidated, darkMode }) => {
             </button>
           </div>
         </form>
+
+        {onDisconnect && (
+          <div style={{
+            ...styles.disconnectSection,
+            borderTop: darkMode ? '1px solid #333' : '1px solid #e0e0e0',
+          }}>
+            <button
+              onClick={() => { onDisconnect(); onClose(); }}
+              style={{
+                ...styles.disconnectButton,
+                backgroundColor: darkMode ? '#3d1c1c' : '#fff0f0',
+                color: '#dc3545',
+                border: darkMode ? '1px solid #5c2020' : '1px solid #f5c6cb',
+              }}
+            >
+              Disconnect from Canvas
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -220,6 +239,17 @@ const styles = {
     fontSize: '14px',
     fontWeight: '500',
     cursor: 'pointer'
+  },
+  disconnectSection: {
+    padding: '16px 24px',
+  },
+  disconnectButton: {
+    width: '100%',
+    padding: '10px 20px',
+    borderRadius: '4px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
   }
 };
 

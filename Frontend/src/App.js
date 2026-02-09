@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Calendar from './components/Calendar';
 import TaskPanel from './components/TaskPanel';
-import SyncIndicator from './components/SyncIndicator';
 import TokenModal from './components/TokenModal';
 import { getAssignments, getCalendarEvents, getCourses, getSyncStatus, syncAssignments } from './services/api';
 
@@ -13,8 +12,10 @@ function App() {
   const [courses, setCourses] = useState([]);
   const [lastSync, setLastSync] = useState(null);
   const [syncing, setSyncing] = useState(false);
-  const [taskPanelPosition, setTaskPanelPosition] = useState('right');
   const [showTokenModal, setShowTokenModal] = useState(false);
+  const [panelSide, setPanelSide] = useState(() => {
+    return localStorage.getItem('taskPanelSide') || 'right';
+  });
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem('dark_mode') === 'true';
   });
@@ -112,6 +113,13 @@ function App() {
     loadSyncStatus(creds.canvasToken);
   };
 
+  // Only show assignments from currently active courses
+  const activeAssignments = useMemo(() => {
+    if (courses.length === 0) return assignments;
+    const activeCourseIds = new Set(courses.map(c => String(c.id)));
+    return assignments.filter(a => activeCourseIds.has(String(a.course_id)));
+  }, [assignments, courses]);
+
   const handleDisconnect = () => {
     if (window.confirm('Are you sure you want to disconnect from Canvas?')) {
       localStorage.removeItem('canvas_url');
@@ -128,41 +136,42 @@ function App() {
   return (
     <div style={{...styles.app, backgroundColor: darkMode ? '#121212' : '#fff'}}>
       <div style={{...styles.header, backgroundColor: darkMode ? '#1a1a2e' : '#007bff'}}>
-        <h1 style={styles.title}>📚 Canvas Calendar</h1>
+        <h1 style={styles.title}>Canvas-Lite</h1>
         
         <div style={styles.headerActions}>
-          <button
+          <div
             onClick={toggleDarkMode}
-            style={styles.themeButton}
+            style={styles.toggleContainer}
             title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
           >
-            {darkMode ? 'Light' : 'Dark'}
-          </button>
+            <span style={styles.toggleLabel}>{darkMode ? '🌙' : '☀️'}</span>
+            <div style={{
+              ...styles.toggleTrack,
+              backgroundColor: darkMode ? '#64b5f6' : 'rgba(255,255,255,0.35)',
+            }}>
+              <div style={{
+                ...styles.toggleThumb,
+                transform: darkMode ? 'translateX(20px)' : 'translateX(0)',
+              }} />
+            </div>
+          </div>
 
           {authenticated && (
             <>
               <button
-                onClick={() => setTaskPanelPosition(taskPanelPosition === 'right' ? 'left' : 'right')}
-                style={styles.toggleButton}
-                title="Move task panel"
+                onClick={handleSync}
+                disabled={syncing}
+                style={styles.syncButton}
+                title={lastSync ? `Last synced ${new Date(lastSync).toLocaleTimeString()}` : 'Never synced'}
               >
-                {taskPanelPosition === 'right' ? '⬅️' : '➡️'} Move Panel
+                {syncing ? 'Syncing...' : 'Sync'}
               </button>
-              
-              <button 
-                onClick={() => setShowTokenModal(true)} 
+              <button
+                onClick={() => setShowTokenModal(true)}
                 style={styles.settingsButton}
                 title="Canvas settings"
               >
                 Settings
-              </button>
-              
-              <button 
-                onClick={handleDisconnect} 
-                style={styles.disconnectButton}
-                title="Disconnect from Canvas"
-              >
-                Disconnect
               </button>
             </>
           )}
@@ -180,19 +189,10 @@ function App() {
         </div>
       </div>
 
-      {authenticated && (
-        <SyncIndicator
-          lastSync={lastSync}
-          onSync={handleSync}
-          syncing={syncing}
-          darkMode={darkMode}
-        />
-      )}
-
       <div style={{
         ...styles.content,
-        marginLeft: authenticated && taskPanelPosition === 'left' ? '380px' : '0',
-        marginRight: authenticated && taskPanelPosition === 'right' ? '380px' : '0'
+        marginLeft: authenticated && panelSide === 'left' ? '380px' : '0',
+        marginRight: authenticated && panelSide === 'right' ? '380px' : '0'
       }}>
         {!authenticated ? (
           <div style={{...styles.emptyState, backgroundColor: darkMode ? '#1e1e2e' : '#f8f9fa'}}>
@@ -205,16 +205,20 @@ function App() {
             </div>
           </div>
         ) : (
-          <Calendar assignments={assignments} calendarEvents={calendarEvents} courses={courses} darkMode={darkMode} />
+          <Calendar assignments={activeAssignments} calendarEvents={calendarEvents} courses={courses} darkMode={darkMode} />
         )}
       </div>
 
       {authenticated && (
         <TaskPanel
-          assignments={assignments}
+          assignments={activeAssignments}
           onTaskUpdate={() => loadAssignments(credentials.canvasToken)}
-          position={taskPanelPosition}
           darkMode={darkMode}
+          side={panelSide}
+          onSideChange={(newSide) => {
+            setPanelSide(newSide);
+            localStorage.setItem('taskPanelSide', newSide);
+          }}
         />
       )}
 
@@ -222,6 +226,7 @@ function App() {
         isOpen={showTokenModal}
         onClose={() => setShowTokenModal(false)}
         onTokenValidated={handleTokenValidated}
+        onDisconnect={authenticated ? handleDisconnect : null}
         darkMode={darkMode}
       />
     </div>
@@ -255,7 +260,37 @@ const styles = {
     gap: '10px',
     alignItems: 'center'
   },
-  themeButton: {
+  toggleContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    cursor: 'pointer',
+    padding: '4px 8px',
+    borderRadius: '4px',
+    userSelect: 'none',
+  },
+  toggleLabel: {
+    fontSize: '16px',
+  },
+  toggleTrack: {
+    width: '40px',
+    height: '20px',
+    borderRadius: '10px',
+    position: 'relative',
+    transition: 'background-color 0.3s',
+  },
+  toggleThumb: {
+    width: '16px',
+    height: '16px',
+    borderRadius: '50%',
+    backgroundColor: 'white',
+    position: 'absolute',
+    top: '2px',
+    left: '2px',
+    transition: 'transform 0.3s',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+  },
+  syncButton: {
     padding: '8px 16px',
     backgroundColor: 'rgba(255,255,255,0.2)',
     color: 'white',
@@ -265,32 +300,11 @@ const styles = {
     fontSize: '14px',
     fontWeight: '500'
   },
-  toggleButton: {
-    padding: '8px 16px',
-    backgroundColor: 'white',
-    color: '#007bff',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
-    transition: 'transform 0.2s'
-  },
   settingsButton: {
     padding: '8px 16px',
     backgroundColor: 'rgba(255,255,255,0.2)',
     color: 'white',
     border: '1px solid white',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500'
-  },
-  disconnectButton: {
-    padding: '8px 16px',
-    backgroundColor: '#dc3545',
-    color: 'white',
-    border: 'none',
     borderRadius: '4px',
     cursor: 'pointer',
     fontSize: '14px',

@@ -180,15 +180,13 @@ router.get('/courses', async (req, res) => {
     const canvas = new CanvasAPI(user.canvas_url, canvas_token);
     const courses = await canvas.getCourses();
 
-    const parsed = courses
-      .filter(c => c.start_at || c.end_at)
-      .map(course => ({
-        id: course.id,
-        name: course.name || 'Unknown Course',
-        course_code: course.course_code || '',
-        start_at: course.start_at || null,
-        end_at: course.end_at || null
-      }));
+    const parsed = courses.map(course => ({
+      id: course.id,
+      name: course.name || 'Unknown Course',
+      course_code: course.course_code || '',
+      start_at: course.start_at || null,
+      end_at: course.end_at || null
+    }));
 
     res.json(parsed);
   } catch (error) {
@@ -214,8 +212,8 @@ router.get('/calendar-events', async (req, res) => {
 
     // Default to current month range if no dates provided
     const now = new Date();
-    const start = start_date || new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
-    const end = end_date || new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString();
+    const start = start_date || new Date(now.getFullYear(), now.getMonth() - 3, 1).toISOString();
+    const end = end_date || new Date(now.getFullYear(), now.getMonth() + 4, 0).toISOString();
 
     const canvas = new CanvasAPI(user.canvas_url, canvas_token);
     const events = await canvas.getCalendarEvents(start, end);

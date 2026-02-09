@@ -1,8 +1,65 @@
-import React from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import moment from 'moment';
 import { toggleAssignmentCompletion } from '../services/api';
 
-const TaskPanel = ({ assignments, onTaskUpdate, position = 'right', darkMode }) => {
+const TaskPanel = ({ assignments, onTaskUpdate, darkMode, side, onSideChange }) => {
+  const panelRef = useRef(null);
+  const dragOffset = useRef({ x: 0, y: 0 });
+  const dragPositionRef = useRef(null);
+
+  const [dragPosition, setDragPosition] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragStart = useCallback((e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'A') return;
+
+    if (panelRef.current) {
+      const rect = panelRef.current.getBoundingClientRect();
+      dragOffset.current = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+      const initialPos = { x: rect.left, y: rect.top };
+      dragPositionRef.current = initialPos;
+      setDragPosition(initialPos);
+      setIsDragging(true);
+    }
+    e.preventDefault();
+  }, []);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e) => {
+      const newX = Math.max(0, Math.min(e.clientX - dragOffset.current.x, window.innerWidth - 280));
+      const newY = Math.max(0, Math.min(e.clientY - dragOffset.current.y, window.innerHeight - 100));
+      const newPos = { x: newX, y: newY };
+      dragPositionRef.current = newPos;
+      setDragPosition(newPos);
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      const pos = dragPositionRef.current;
+      if (pos) {
+        const panelCenter = pos.x + 175;
+        const screenCenter = window.innerWidth / 2;
+        const newSide = panelCenter < screenCenter ? 'left' : 'right';
+        onSideChange(newSide);
+      }
+      setDragPosition(null);
+      dragPositionRef.current = null;
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, onSideChange]);
+
   const handleToggleComplete = async (assignmentId, currentStatus) => {
     try {
       await toggleAssignmentCompletion(assignmentId, !currentStatus);
@@ -23,10 +80,10 @@ const TaskPanel = ({ assignments, onTaskUpdate, position = 'right', darkMode }) 
     const due = moment(dueDate);
     const daysUntilDue = due.diff(now, 'days');
 
-    if (daysUntilDue < 0) return '#d32f2f'; // Overdue - red
-    if (daysUntilDue <= 2) return '#f57c00'; // Due soon - orange
-    if (daysUntilDue <= 7) return '#fbc02d'; // Due this week - yellow
-    return '#388e3c'; // Future - green
+    if (daysUntilDue < 0) return '#d32f2f';
+    if (daysUntilDue <= 2) return '#f57c00';
+    if (daysUntilDue <= 7) return '#fbc02d';
+    return '#388e3c';
   };
 
   const formatDueDate = (dueDate) => {
@@ -41,13 +98,77 @@ const TaskPanel = ({ assignments, onTaskUpdate, position = 'right', darkMode }) 
     return due.format('MMM D, YYYY');
   };
 
+  const panelPositionStyle = dragPosition
+    ? { left: dragPosition.x, top: dragPosition.y, right: 'auto', transition: 'none' }
+    : { [side]: 0, top: 85, transition: 'box-shadow 0.3s' };
+
+  // Determine which side the panel would snap to during drag
+  const hoverSide = dragPosition
+    ? (dragPosition.x + 175 < window.innerWidth / 2 ? 'left' : 'right')
+    : null;
+
+  const dropZoneBase = {
+    position: 'fixed',
+    top: 85,
+    width: '350px',
+    height: 'calc(100vh - 95px)',
+    borderRadius: '16px',
+    margin: '10px',
+    pointerEvents: 'none',
+    zIndex: 99,
+    transition: 'opacity 0.2s, border-color 0.2s, background-color 0.2s',
+  };
+
   return (
-    <div style={{
-      ...styles.panel,
-      [position]: 0,
-      backgroundColor: darkMode ? '#1e1e2e' : 'white',
-      boxShadow: darkMode ? '0 4px 20px rgba(0,0,0,0.4)' : '0 4px 20px rgba(0,0,0,0.15)'
-    }}>
+    <>
+      {isDragging && (
+        <>
+          <div style={{
+            ...dropZoneBase,
+            left: 0,
+            border: `2px dashed ${hoverSide === 'left' ? (darkMode ? '#64b5f6' : '#007bff') : (darkMode ? '#444' : '#ccc')}`,
+            backgroundColor: hoverSide === 'left'
+              ? (darkMode ? 'rgba(100,181,246,0.08)' : 'rgba(0,123,255,0.06)')
+              : (darkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
+            opacity: 1,
+          }} />
+          <div style={{
+            ...dropZoneBase,
+            right: 0,
+            border: `2px dashed ${hoverSide === 'right' ? (darkMode ? '#64b5f6' : '#007bff') : (darkMode ? '#444' : '#ccc')}`,
+            backgroundColor: hoverSide === 'right'
+              ? (darkMode ? 'rgba(100,181,246,0.08)' : 'rgba(0,123,255,0.06)')
+              : (darkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
+            opacity: 1,
+          }} />
+        </>
+      )}
+      <div
+        ref={panelRef}
+        style={{
+          ...styles.panel,
+          ...panelPositionStyle,
+          backgroundColor: darkMode ? '#1e1e2e' : 'white',
+          boxShadow: isDragging
+            ? '0 8px 32px rgba(0,0,0,0.3)'
+            : darkMode ? '0 4px 20px rgba(0,0,0,0.4)' : '0 4px 20px rgba(0,0,0,0.15)',
+          userSelect: isDragging ? 'none' : undefined,
+        }}
+      >
+      <div
+        onMouseDown={handleDragStart}
+        style={{
+          ...styles.dragHandle,
+          backgroundColor: darkMode ? '#252540' : '#f0f0f0',
+          cursor: isDragging ? 'grabbing' : 'grab',
+        }}
+      >
+        <div style={{
+          ...styles.dragBar,
+          backgroundColor: darkMode ? '#555' : '#bbb',
+        }} />
+      </div>
+
       <div style={{
         ...styles.header,
         backgroundColor: darkMode ? '#252540' : '#f8f9fa',
@@ -149,13 +270,13 @@ const TaskPanel = ({ assignments, onTaskUpdate, position = 'right', darkMode }) 
         )}
       </div>
     </div>
+    </>
   );
 };
 
 const styles = {
   panel: {
     position: 'fixed',
-    top: '75px',
     width: '350px',
     height: 'calc(100vh - 95px)',
     minWidth: '280px',
@@ -169,12 +290,26 @@ const styles = {
     borderRadius: '16px',
     margin: '10px',
     resize: 'both',
-    overflow: 'auto'
+    overflow: 'hidden'
+  },
+  dragHandle: {
+    padding: '6px 0',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: '16px 16px 0 0',
+    flexShrink: 0,
+  },
+  dragBar: {
+    width: '40px',
+    height: '5px',
+    borderRadius: '3px',
   },
   header: {
-    padding: '20px',
+    padding: '16px 20px',
     borderBottom: '2px solid #e0e0e0',
-    backgroundColor: '#f8f9fa'
+    backgroundColor: '#f8f9fa',
+    flexShrink: 0,
   },
   title: {
     margin: '0 0 10px 0',
