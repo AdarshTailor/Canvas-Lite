@@ -110,20 +110,12 @@ router.post('/sync', async (req, res) => {
       assignments_synced: syncedCount,
       last_sync: user.last_sync
     });
-<<<<<<< HEAD
-=======
-
->>>>>>> 3489824 (Added composite index to Assignment.js)
   } catch (error) {
     console.error('Sync error:', error);
     res.status(500).json({ detail: error.message });
   }
 });
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 3489824 (Added composite index to Assignment.js)
 // Get all assignments for a user
 router.get('/assignments', async (req, res) => {
   try {
