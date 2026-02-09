@@ -185,7 +185,8 @@ router.get('/courses', async (req, res) => {
       name: course.name || 'Unknown Course',
       course_code: course.course_code || '',
       start_at: course.start_at || null,
-      end_at: course.end_at || null
+      end_at: course.end_at || null,
+      term_name: (course.term && course.term.name) || null
     }));
 
     res.json(parsed);

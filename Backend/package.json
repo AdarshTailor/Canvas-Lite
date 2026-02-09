@@ -8,15 +8,18 @@
     "dev": "nodemon server.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
+    "express": "^4.21.2",
     "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "sequelize": "^6.35.1",
-    "sqlite3": "^5.1.6",
-    "axios": "^1.6.2",
-    "body-parser": "^1.20.2"
+    "dotenv": "^16.4.7",
+    "sequelize": "^6.37.7",
+    "sqlite3": "^5.1.7",
+    "axios": "^1.7.9",
+    "body-parser": "^1.20.3"
+  },
+  "overrides": {
+    "tar": "^7.5.7"
   },
   "devDependencies": {
-    "nodemon": "^3.0.2"
+    "nodemon": "^3.1.9"
   }
 }

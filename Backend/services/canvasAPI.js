@@ -30,12 +30,28 @@ class CanvasAPI {
           headers: this.headers,
           params: {
             enrollment_state: 'active',
-            per_page: 100
+            per_page: 100,
+            'include[]': 'term'
           },
           timeout: 10000
         }
       );
-      return response.data;
+
+      // Filter to current semester only — Canvas keeps old courses
+      // with active enrollment even after the term ends
+      const now = new Date();
+      return response.data.filter(course => {
+        // Use term end date if available
+        if (course.term && course.term.end_at) {
+          return new Date(course.term.end_at) > now;
+        }
+        // Fall back to course end date
+        if (course.end_at) {
+          return new Date(course.end_at) > now;
+        }
+        // No end date — assume current
+        return true;
+      });
     } catch (error) {
       console.error('Error fetching courses:', error.message);
       return [];
@@ -88,17 +104,22 @@ class CanvasAPI {
       // Fetch in batches since context_codes is an array param
       for (let i = 0; i < contextCodes.length; i += 10) {
         const batch = contextCodes.slice(i, i + 10);
+
+        // Use URLSearchParams to correctly serialize context_codes[]
+        // axios 1.x default serializer adds indexes (context_codes[][0])
+        // which Canvas API does not understand
+        const params = new URLSearchParams();
+        params.append('type', 'event');
+        params.append('start_date', startDate);
+        params.append('end_date', endDate);
+        params.append('per_page', '100');
+        batch.forEach(code => params.append('context_codes[]', code));
+
         const response = await axios.get(
           `${this.baseUrl}/api/v1/calendar_events`,
           {
             headers: this.headers,
-            params: {
-              type: 'event',
-              start_date: startDate,
-              end_date: endDate,
-              per_page: 100,
-              'context_codes[]': batch
-            },
+            params,
             timeout: 15000
           }
         );
