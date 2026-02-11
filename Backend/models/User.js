@@ -10,7 +10,6 @@ const User = sequelize.define('User', {
   canvas_token: {
     type: DataTypes.STRING,
     allowNull: false,
-    // THE MAGIC HAPPENS HERE:
     set(value) {
       this.setDataValue('canvas_token', encrypt(value));
     },
