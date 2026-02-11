@@ -91,6 +91,12 @@ router.post('/sync', async (req, res) => {
         });
       }
 
+      // UPSERT (Insert if new, Update if exists)
+      await Assignment.upsert({
+        user_id: user.id,
+        ...parsed
+      });
+
       syncedCount++;
     }
 

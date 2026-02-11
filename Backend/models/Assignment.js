@@ -9,7 +9,6 @@ const Assignment = sequelize.define('Assignment', {
   },
   canvas_id: {
     type: DataTypes.STRING,
-    unique: true,
     allowNull: false
   },
   user_id: {
@@ -55,6 +54,15 @@ const Assignment = sequelize.define('Assignment', {
 }, {
   tableName: 'assignments',
   timestamps: true,
+
+  // Composite index to use as primary key
+  indexes: [
+    {
+      unique: true,
+      fields: ['canvas_id', 'user_id']
+    }
+  ],
+
   createdAt: 'created_at',
   updatedAt: 'updated_at'
 });
