@@ -47,4 +47,30 @@ router.get('/calendar-events', authenticateUser, async (req, res) => {
   }
 });
 
+// Diagnostic: discover what schedule data Canvas provides
+router.get('/debug/schedule-data', authenticateUser, async (req, res) => {
+  try {
+    if (!req.user) return res.status(404).json({ detail: 'User not found' });
+
+    const canvas = new CanvasAPI(req.user.canvas_url, req.canvasToken);
+    const data = await canvas.getScheduleData();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ detail: error.message });
+  }
+});
+
+// Diagnostic: fetch ICS calendar feeds to inspect class schedule data
+router.get('/debug/ics-feeds', authenticateUser, async (req, res) => {
+  try {
+    if (!req.user) return res.status(404).json({ detail: 'User not found' });
+
+    const canvas = new CanvasAPI(req.user.canvas_url, req.canvasToken);
+    const feeds = await canvas.getICSFeeds();
+    res.json(feeds);
+  } catch (error) {
+    res.status(500).json({ detail: error.message });
+  }
+});
+
 module.exports = router;

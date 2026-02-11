@@ -6,6 +6,7 @@ const { sequelize } = require('./models');
 const authRoutes = require('./routes/auth');
 const assignmentRoutes = require('./routes/assignments');
 const canvasRoutes = require('./routes/canvas');
+const scheduleRoutes = require('./routes/schedule');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -38,6 +39,7 @@ app.get('/', (req, res) => {
 app.use('/api', authRoutes);
 app.use('/api', canvasRoutes);
 app.use('/api/assignments', assignmentRoutes);
+app.use('/api', scheduleRoutes);
 
 // Sync database and start server
 async function startServer() {

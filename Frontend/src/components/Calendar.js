@@ -55,8 +55,8 @@ const Calendar = ({ assignments, calendarEvents = [], courses = [], darkMode }) 
     }
   });
 
-  // Merge all event types
-  const events = [...assignmentEvents, ...classEvents, ...courseEvents];
+  // Calendar shows class schedule only — assignments live in the TaskPanel
+  const events = [...classEvents, ...courseEvents];
 
   const eventStyleGetter = (event) => {
     // Course start/end markers

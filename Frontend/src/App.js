@@ -1,18 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import Calendar from './components/Calendar';
+import Timetable from './components/Timetable';
+import ScheduleEditor from './components/ScheduleEditor';
 import TaskPanel from './components/TaskPanel';
 import TokenModal from './components/TokenModal';
-import { getAssignments, getCalendarEvents, getCourses, getSyncStatus, syncAssignments } from './services/api';
+import { getAssignments, getCourses, getClassSchedule, getSyncStatus, syncAssignments } from './services/api';
 
 function App() {
   const [authenticated, setAuthenticated] = useState(false);
   const [credentials, setCredentials] = useState(null);
   const [assignments, setAssignments] = useState([]);
-  const [calendarEvents, setCalendarEvents] = useState([]);
   const [courses, setCourses] = useState([]);
   const [lastSync, setLastSync] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [showTokenModal, setShowTokenModal] = useState(false);
+  const [classSchedule, setClassSchedule] = useState([]);
+  const [showScheduleEditor, setShowScheduleEditor] = useState(false);
   const [panelSide, setPanelSide] = useState(() => {
     return localStorage.getItem('taskPanelSide') || 'right';
   });
@@ -35,8 +37,8 @@ function App() {
       setCredentials({ canvasUrl: storedUrl, canvasToken: storedToken });
       setAuthenticated(true);
       loadAssignments(storedToken);
-      loadCalendarEvents(storedToken);
       loadCourses(storedToken);
+      loadClassSchedule(storedToken);
       loadSyncStatus(storedToken);
     }
   }, []);
@@ -60,21 +62,21 @@ function App() {
     }
   };
 
-  const loadCalendarEvents = async (token) => {
-    try {
-      const data = await getCalendarEvents(token);
-      setCalendarEvents(data);
-    } catch (err) {
-      console.error('Error loading calendar events:', err);
-    }
-  };
-
   const loadCourses = async (token) => {
     try {
       const data = await getCourses(token);
       setCourses(data);
     } catch (err) {
       console.error('Error loading courses:', err);
+    }
+  };
+
+  const loadClassSchedule = async (token) => {
+    try {
+      const data = await getClassSchedule(token);
+      setClassSchedule(data);
+    } catch (err) {
+      console.error('Error loading class schedule:', err);
     }
   };
 
@@ -95,8 +97,8 @@ function App() {
       const result = await syncAssignments(credentials.canvasUrl, credentials.canvasToken);
       setLastSync(result.last_sync);
       await loadAssignments(credentials.canvasToken);
-      await loadCalendarEvents(credentials.canvasToken);
       await loadCourses(credentials.canvasToken);
+      await loadClassSchedule(credentials.canvasToken);
     } catch (err) {
       console.error('Error syncing:', err);
     } finally {
@@ -108,8 +110,8 @@ function App() {
     setCredentials(creds);
     setAuthenticated(true);
     loadAssignments(creds.canvasToken);
-    loadCalendarEvents(creds.canvasToken);
     loadCourses(creds.canvasToken);
+    loadClassSchedule(creds.canvasToken);
     loadSyncStatus(creds.canvasToken);
   };
 
@@ -127,7 +129,6 @@ function App() {
       setAuthenticated(false);
       setCredentials(null);
       setAssignments([]);
-      setCalendarEvents([]);
       setCourses([]);
       setLastSync(null);
     }
@@ -165,6 +166,13 @@ function App() {
                 title={lastSync ? `Last synced ${new Date(lastSync).toLocaleTimeString()}` : 'Never synced'}
               >
                 {syncing ? 'Syncing...' : 'Sync'}
+              </button>
+              <button
+                onClick={() => setShowScheduleEditor(true)}
+                style={styles.syncButton}
+                title="Edit class schedule"
+              >
+                Edit Schedule
               </button>
               <button
                 onClick={() => setShowTokenModal(true)}
@@ -205,7 +213,7 @@ function App() {
             </div>
           </div>
         ) : (
-          <Calendar assignments={activeAssignments} calendarEvents={calendarEvents} courses={courses} darkMode={darkMode} />
+          <Timetable schedule={classSchedule} onEditSchedule={() => setShowScheduleEditor(true)} darkMode={darkMode} />
         )}
       </div>
 
@@ -221,6 +229,15 @@ function App() {
           }}
         />
       )}
+
+      <ScheduleEditor
+        isOpen={showScheduleEditor}
+        onClose={() => setShowScheduleEditor(false)}
+        courses={courses}
+        existingSchedule={classSchedule}
+        onSave={() => loadClassSchedule(credentials.canvasToken)}
+        darkMode={darkMode}
+      />
 
       <TokenModal
         isOpen={showTokenModal}
