@@ -40,16 +40,23 @@ class CanvasAPI {
       // Filter to current semester only — Canvas keeps old courses
       // with active enrollment even after the term ends
       const now = new Date();
+      const sixMonthsAgo = new Date(now);
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
       return response.data.filter(course => {
-        // Use term end date if available
-        if (course.term && course.term.end_at) {
-          return new Date(course.term.end_at) > now;
+        // Check term dates first (most reliable for semester filtering)
+        if (course.term) {
+          if (course.term.end_at && new Date(course.term.end_at) < now) return false;
+          if (course.term.start_at && new Date(course.term.start_at) < sixMonthsAgo && !course.term.end_at) return false;
         }
-        // Fall back to course end date
-        if (course.end_at) {
-          return new Date(course.end_at) > now;
-        }
-        // No end date — assume current
+
+        // Fall back to course-level dates
+        if (course.end_at && new Date(course.end_at) < now) return false;
+        if (course.start_at && new Date(course.start_at) < sixMonthsAgo && !course.end_at) return false;
+
+        // Last resort: if no term/course dates at all, check when the course was created
+        if (course.created_at && new Date(course.created_at) < sixMonthsAgo) return false;
+
         return true;
       });
     } catch (error) {

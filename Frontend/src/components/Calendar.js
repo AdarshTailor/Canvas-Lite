@@ -165,6 +165,11 @@ const Calendar = ({ assignments, calendarEvents = [], courses = [], darkMode }) 
         views={['month', 'week', 'day', 'agenda']}
         defaultView="month"
         popup
+        onSelectEvent={(event) => {
+          if (event.resource.html_url) {
+            window.open(event.resource.html_url, '_blank', 'noopener,noreferrer');
+          }
+        }}
         tooltipAccessor={(event) => {
           if (event.resource.event_type === 'course') {
             const start = moment(event.start).format('MMM D, YYYY');
