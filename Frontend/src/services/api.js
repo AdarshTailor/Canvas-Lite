@@ -48,11 +48,19 @@ export const getCourses = async (canvasToken) => {
   return response.data;
 };
 
-export const toggleAssignmentCompletion = async (assignmentId, isCompleted) => {
+/**
+ * Updated to support Multi-User Architecture
+ * @param {string} assignmentId - This should be the canvas_id
+ * @param {boolean} isCompleted - The new status
+ * @param {string} canvasToken - Required to identify the specific user
+ */
+export const toggleAssignmentCompletion = async (assignmentId, isCompleted, canvasToken) => {
   const response = await axios.patch(
     `${API_BASE_URL}/assignments/${assignmentId}/complete`,
-    null,
-    { params: { is_completed: isCompleted } }
+    { 
+      is_completed: isCompleted,
+      canvas_token: canvasToken // Sent in body for security and identification
+    }
   );
   return response.data;
 };

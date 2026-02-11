@@ -2,17 +2,10 @@ const { DataTypes } = require('sequelize');
 const sequelize = require('../database');
 
 const Assignment = sequelize.define('Assignment', {
-  id: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true
-  },
+  // The Canvas ID is the global unique identifier
   canvas_id: {
     type: DataTypes.STRING,
-    allowNull: false
-  },
-  user_id: {
-    type: DataTypes.INTEGER,
+    primaryKey: true,
     allowNull: false
   },
   title: {
@@ -46,23 +39,10 @@ const Assignment = sequelize.define('Assignment', {
   html_url: {
     type: DataTypes.STRING,
     allowNull: true
-  },
-  is_completed: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false
   }
 }, {
   tableName: 'assignments',
   timestamps: true,
-
-  // Composite index to use as primary key
-  indexes: [
-    {
-      unique: true,
-      fields: ['canvas_id', 'user_id']
-    }
-  ],
-
   createdAt: 'created_at',
   updatedAt: 'updated_at'
 });

@@ -1,16 +1,22 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../database');
+const { encrypt, decrypt } = require('../services/crypto');
 
 const User = sequelize.define('User', {
   id: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true
+    type: DataTypes.STRING,
+    primaryKey: true
   },
   canvas_token: {
     type: DataTypes.STRING,
-    unique: true,
-    allowNull: false
+    allowNull: false,
+    set(value) {
+      this.setDataValue('canvas_token', encrypt(value));
+    },
+    get() {
+      const rawValue = this.getDataValue('canvas_token');
+      return rawValue ? decrypt(rawValue) : null;
+    }
   },
   canvas_url: {
     type: DataTypes.STRING,
@@ -22,9 +28,7 @@ const User = sequelize.define('User', {
   }
 }, {
   tableName: 'users',
-  timestamps: true,
-  createdAt: 'created_at',
-  updatedAt: 'updated_at'
+  timestamps: true
 });
 
 module.exports = User;

@@ -60,10 +60,21 @@ const TaskPanel = ({ assignments, onTaskUpdate, darkMode, side, onSideChange }) 
     };
   }, [isDragging, onSideChange]);
 
-  const handleToggleComplete = async (assignmentId, currentStatus) => {
+  const handleToggleComplete = async (canvasId, currentStatus) => {
     try {
-      await toggleAssignmentCompletion(assignmentId, !currentStatus);
-      onTaskUpdate();
+      // 1. Get the token from storage
+      const token = localStorage.getItem('canvas_token'); 
+
+      if (!token) {
+        console.error("No token found. Please log in.");
+        return;
+      }
+
+      // 2. Pass the canvasId and token to the API
+      await toggleAssignmentCompletion(canvasId, !currentStatus, token);
+      
+      // 3. Trigger parent refresh
+      onTaskUpdate(); 
     } catch (err) {
       console.error('Error toggling completion:', err);
     }
@@ -102,7 +113,6 @@ const TaskPanel = ({ assignments, onTaskUpdate, darkMode, side, onSideChange }) 
     ? { left: dragPosition.x, top: dragPosition.y, right: 'auto', transition: 'none' }
     : { [side]: 0, top: 85, transition: 'box-shadow 0.3s' };
 
-  // Determine which side the panel would snap to during drag
   const hoverSide = dragPosition
     ? (dragPosition.x + 175 < window.innerWidth / 2 ? 'left' : 'right')
     : null;
@@ -191,7 +201,7 @@ const TaskPanel = ({ assignments, onTaskUpdate, darkMode, side, onSideChange }) 
           <p style={styles.emptyState}>No upcoming assignments! 🎉</p>
         ) : (
           upcomingAssignments.map(assignment => (
-            <div key={assignment.id} style={{
+            <div key={assignment.canvas_id} style={{
               ...styles.taskCard,
               backgroundColor: darkMode ? '#252540' : '#f8f9fa',
               border: darkMode ? '1px solid #333' : '1px solid #e0e0e0'
@@ -200,7 +210,7 @@ const TaskPanel = ({ assignments, onTaskUpdate, darkMode, side, onSideChange }) 
                 <input
                   type="checkbox"
                   checked={assignment.is_completed}
-                  onChange={() => handleToggleComplete(assignment.id, assignment.is_completed)}
+                  onChange={() => handleToggleComplete(assignment.canvas_id, assignment.is_completed)}
                   style={styles.checkbox}
                 />
                 <div style={styles.taskInfo}>
@@ -244,7 +254,7 @@ const TaskPanel = ({ assignments, onTaskUpdate, darkMode, side, onSideChange }) 
           <>
             <h3 style={{...styles.sectionTitle, color: darkMode ? '#a0a0a0' : '#666'}}>Completed</h3>
             {completedAssignments.map(assignment => (
-              <div key={assignment.id} style={{
+              <div key={assignment.canvas_id} style={{
                 ...styles.taskCard,
                 ...styles.completedCard,
                 backgroundColor: darkMode ? '#252540' : '#f8f9fa',
@@ -254,7 +264,7 @@ const TaskPanel = ({ assignments, onTaskUpdate, darkMode, side, onSideChange }) 
                   <input
                     type="checkbox"
                     checked={assignment.is_completed}
-                    onChange={() => handleToggleComplete(assignment.id, assignment.is_completed)}
+                    onChange={() => handleToggleComplete(assignment.canvas_id, assignment.is_completed)}
                     style={styles.checkbox}
                   />
                   <div style={styles.taskInfo}>
