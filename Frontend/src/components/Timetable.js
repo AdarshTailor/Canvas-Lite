@@ -1,8 +1,8 @@
 import React from 'react';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-const START_HOUR = 7;
-const END_HOUR = 21;
+const START_HOUR = 0;
+const END_HOUR = 24;
 const HOUR_HEIGHT = 60; // px per hour
 const HEADER_HEIGHT = 40;
 

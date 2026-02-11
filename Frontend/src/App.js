@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import Timetable from './components/Timetable';
+import Calendar from './components/Calendar';
 import ScheduleEditor from './components/ScheduleEditor';
 import TaskPanel from './components/TaskPanel';
 import TokenModal from './components/TokenModal';
-import { getAssignments, getCourses, getClassSchedule, getSyncStatus, syncAssignments } from './services/api';
+import { getAssignments, getCalendarEvents, getCourses, getClassSchedule, getSyncStatus, syncAssignments } from './services/api';
 
 function App() {
   const [authenticated, setAuthenticated] = useState(false);
@@ -14,6 +14,7 @@ function App() {
   const [syncing, setSyncing] = useState(false);
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [classSchedule, setClassSchedule] = useState([]);
+  const [calendarEvents, setCalendarEvents] = useState([]);
   const [showScheduleEditor, setShowScheduleEditor] = useState(false);
   const [panelSide, setPanelSide] = useState(() => {
     return localStorage.getItem('taskPanelSide') || 'right';
@@ -39,6 +40,7 @@ function App() {
       loadAssignments(storedToken);
       loadCourses(storedToken);
       loadClassSchedule(storedToken);
+      loadCalendarEvents(storedToken);
       loadSyncStatus(storedToken);
     }
   }, []);
@@ -71,6 +73,15 @@ function App() {
     }
   };
 
+  const loadCalendarEvents = async (token) => {
+    try {
+      const data = await getCalendarEvents(token);
+      setCalendarEvents(data);
+    } catch (err) {
+      console.error('Error loading calendar events:', err);
+    }
+  };
+
   const loadClassSchedule = async (token) => {
     try {
       const data = await getClassSchedule(token);
@@ -99,6 +110,7 @@ function App() {
       await loadAssignments(credentials.canvasToken);
       await loadCourses(credentials.canvasToken);
       await loadClassSchedule(credentials.canvasToken);
+      await loadCalendarEvents(credentials.canvasToken);
     } catch (err) {
       console.error('Error syncing:', err);
     } finally {
@@ -112,6 +124,7 @@ function App() {
     loadAssignments(creds.canvasToken);
     loadCourses(creds.canvasToken);
     loadClassSchedule(creds.canvasToken);
+    loadCalendarEvents(creds.canvasToken);
     loadSyncStatus(creds.canvasToken);
   };
 
@@ -213,7 +226,7 @@ function App() {
             </div>
           </div>
         ) : (
-          <Timetable schedule={classSchedule} onEditSchedule={() => setShowScheduleEditor(true)} darkMode={darkMode} />
+          <Calendar assignments={activeAssignments} calendarEvents={calendarEvents} courses={courses} classSchedule={classSchedule} darkMode={darkMode} />
         )}
       </div>
 

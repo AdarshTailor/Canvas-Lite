@@ -11,12 +11,12 @@ const ScheduleEditor = ({ isOpen, onClose, courses, existingSchedule, onSave, da
   useEffect(() => {
     if (!isOpen) return;
 
+    // Group any existing saved entries by course_id
+    const saved = {};
     if (existingSchedule && existingSchedule.length > 0) {
-      // Group existing entries by course_id, rebuild the editing state
-      const grouped = {};
       existingSchedule.forEach(entry => {
-        if (!grouped[entry.course_id]) {
-          grouped[entry.course_id] = {
+        if (!saved[entry.course_id]) {
+          saved[entry.course_id] = {
             course_id: String(entry.course_id),
             course_name: entry.course_name,
             days: [],
@@ -26,23 +26,26 @@ const ScheduleEditor = ({ isOpen, onClose, courses, existingSchedule, onSave, da
             color: entry.color
           };
         }
-        grouped[entry.course_id].days.push(entry.day_of_week);
+        saved[entry.course_id].days.push(entry.day_of_week);
       });
-      setCourseEntries(Object.values(grouped));
-    } else {
-      // Initialize from courses list
-      setCourseEntries(
-        courses.map((course, i) => ({
-          course_id: String(course.id),
+    }
+
+    // Merge: use saved data if it exists, otherwise initialize empty
+    setCourseEntries(
+      courses.map((course, i) => {
+        const key = String(course.id);
+        if (saved[key]) return saved[key];
+        return {
+          course_id: key,
           course_name: course.name || 'Unknown Course',
           days: [],
           start_time: '09:00',
           end_time: '09:50',
           location: '',
           color: COLORS[i % COLORS.length]
-        }))
-      );
-    }
+        };
+      })
+    );
   }, [isOpen, courses, existingSchedule]);
 
   const toggleDay = (courseIndex, dayIndex) => {

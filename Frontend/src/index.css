@@ -149,6 +149,11 @@ code {
   border-color: #333;
 }
 
+/* Hide half-hour lines in week/day views */
+.rbc-timeslot-group .rbc-time-slot:not(:first-child) {
+  border-top: none;
+}
+
 /* Pulse animation for sync indicator */
 @keyframes pulse {
   0%, 100% {
