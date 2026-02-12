@@ -37,20 +37,59 @@ class CanvasAPI {
         }
       );
 
-      // Filter to current semester only — Canvas keeps old courses
-      // with active enrollment even after the term ends
+      // Filter to current semester only — default reject unless provably current
       const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1; // 1-12
+
+      let currentSemester;
+      if (currentMonth <= 5) currentSemester = 'spring';
+      else if (currentMonth <= 7) currentSemester = 'summer';
+      else currentSemester = 'fall';
+
+      const isCurrentSemester = (text) => {
+        const lower = text.toLowerCase();
+        const semesterPattern = /(spring|fall|summer)\s*(20\d{2}|\d{2})\b/g;
+        let match;
+        while ((match = semesterPattern.exec(lower)) !== null) {
+          const sem = match[1];
+          let yr = parseInt(match[2]);
+          if (yr < 100) yr += 2000;
+          if (sem === currentSemester && yr === currentYear) return 'current';
+          return 'old'; // has semester info but doesn't match current
+        }
+        return 'none'; // no semester info found
+      };
+
       return response.data.filter(course => {
-        // Use term end date if available
-        if (course.term && course.term.end_at) {
-          return new Date(course.term.end_at) > now;
+        // 1. Check term name
+        const termCheck = (course.term && course.term.name) ? isCurrentSemester(course.term.name) : 'none';
+        if (termCheck === 'current') return true;
+        if (termCheck === 'old') return false;
+
+        // 2. Check course name for semester+year patterns
+        const nameCheck = isCurrentSemester(course.name || '');
+        if (nameCheck === 'current') return true;
+        if (nameCheck === 'old') return false;
+
+        // 3. No semester info anywhere — check if term dates encompass now
+        if (course.term && course.term.start_at && course.term.end_at) {
+          const termStart = new Date(course.term.start_at);
+          const termEnd = new Date(course.term.end_at);
+          if (termStart <= now && termEnd >= now) return true;
+          return false;
         }
-        // Fall back to course end date
-        if (course.end_at) {
-          return new Date(course.end_at) > now;
+
+        // 4. Check course-level dates
+        if (course.start_at && course.end_at) {
+          const courseStart = new Date(course.start_at);
+          const courseEnd = new Date(course.end_at);
+          if (courseStart <= now && courseEnd >= now) return true;
+          return false;
         }
-        // No end date — assume current
-        return true;
+
+        // 5. No semester info, no dates — likely an advising shell, filter out
+        return false;
       });
     } catch (error) {
       console.error('Error fetching courses:', error.message);
@@ -105,31 +144,164 @@ class CanvasAPI {
       for (let i = 0; i < contextCodes.length; i += 10) {
         const batch = contextCodes.slice(i, i + 10);
 
-        // Use URLSearchParams to correctly serialize context_codes[]
-        // axios 1.x default serializer adds indexes (context_codes[][0])
-        // which Canvas API does not understand
-        const params = new URLSearchParams();
-        params.append('type', 'event');
-        params.append('start_date', startDate);
-        params.append('end_date', endDate);
-        params.append('per_page', '100');
-        batch.forEach(code => params.append('context_codes[]', code));
+        // Paginate through all results for each batch
+        let page = 1;
+        while (true) {
+          // Use URLSearchParams to correctly serialize context_codes[]
+          // axios 1.x default serializer adds indexes (context_codes[][0])
+          // which Canvas API does not understand
+          const params = new URLSearchParams();
+          params.append('type', 'event');
+          params.append('start_date', startDate);
+          params.append('end_date', endDate);
+          params.append('per_page', '100');
+          params.append('page', String(page));
+          batch.forEach(code => params.append('context_codes[]', code));
 
-        const response = await axios.get(
-          `${this.baseUrl}/api/v1/calendar_events`,
-          {
-            headers: this.headers,
-            params,
-            timeout: 15000
-          }
-        );
-        allEvents.push(...response.data);
+          const response = await axios.get(
+            `${this.baseUrl}/api/v1/calendar_events`,
+            {
+              headers: this.headers,
+              params,
+              timeout: 15000
+            }
+          );
+
+          allEvents.push(...response.data);
+
+          // Stop if we got fewer than per_page results (last page)
+          if (response.data.length < 100) break;
+          page++;
+        }
       }
 
       return allEvents;
     } catch (error) {
       console.error('Error fetching calendar events:', error.message);
       return [];
+    }
+  }
+
+  async getScheduleData() {
+    const results = { courses: [], sections: [], calendarEvents: [], enrollments: [] };
+
+    try {
+      // 1. Courses with sections and term info
+      const coursesRes = await axios.get(
+        `${this.baseUrl}/api/v1/courses`,
+        {
+          headers: this.headers,
+          params: {
+            enrollment_state: 'active',
+            per_page: 100,
+            'include[]': ['sections', 'term', 'total_students']
+          },
+          timeout: 10000
+        }
+      );
+      results.courses = coursesRes.data;
+
+      // 2. Detailed sections for each course (may contain meeting times)
+      const filteredCourses = await this.getCourses();
+      for (const course of filteredCourses) {
+        try {
+          const sectionsRes = await axios.get(
+            `${this.baseUrl}/api/v1/courses/${course.id}/sections`,
+            {
+              headers: this.headers,
+              params: { 'include[]': ['students', 'total_students'] },
+              timeout: 10000
+            }
+          );
+          results.sections.push({
+            course_id: course.id,
+            course_name: course.name,
+            sections: sectionsRes.data
+          });
+        } catch (err) {
+          results.sections.push({ course_id: course.id, error: err.message });
+        }
+      }
+
+      // 3. Calendar events — fetch WITHOUT type filter to see everything
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+      const end = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString();
+
+      const contextCodes = filteredCourses.map(c => `course_${c.id}`);
+      const params = new URLSearchParams();
+      params.append('start_date', start);
+      params.append('end_date', end);
+      params.append('per_page', '50');
+      contextCodes.forEach(code => params.append('context_codes[]', code));
+
+      const eventsRes = await axios.get(
+        `${this.baseUrl}/api/v1/calendar_events`,
+        { headers: this.headers, params, timeout: 15000 }
+      );
+      results.calendarEvents = eventsRes.data;
+
+      // 4. User enrollments
+      const enrollRes = await axios.get(
+        `${this.baseUrl}/api/v1/users/self/enrollments`,
+        {
+          headers: this.headers,
+          params: { per_page: 100 },
+          timeout: 10000
+        }
+      );
+      results.enrollments = enrollRes.data;
+    } catch (error) {
+      results.error = error.message;
+    }
+
+    return results;
+  }
+
+  async getICSFeeds() {
+    try {
+      // Get courses with calendar ICS URLs
+      const coursesRes = await axios.get(
+        `${this.baseUrl}/api/v1/courses`,
+        {
+          headers: this.headers,
+          params: {
+            enrollment_state: 'active',
+            per_page: 100,
+            'include[]': ['sections', 'term']
+          },
+          timeout: 10000
+        }
+      );
+
+      const filteredCourses = await this.getCourses();
+      const filteredIds = new Set(filteredCourses.map(c => c.id));
+
+      const results = [];
+      for (const course of coursesRes.data) {
+        if (!filteredIds.has(course.id)) continue;
+        if (!course.calendar || !course.calendar.ics) continue;
+
+        try {
+          const icsRes = await axios.get(course.calendar.ics, { timeout: 10000 });
+          results.push({
+            course_id: course.id,
+            course_name: course.name,
+            ics_url: course.calendar.ics,
+            ics_content: icsRes.data
+          });
+        } catch (err) {
+          results.push({
+            course_id: course.id,
+            course_name: course.name,
+            error: err.message
+          });
+        }
+      }
+
+      return results;
+    } catch (error) {
+      return [{ error: error.message }];
     }
   }
 

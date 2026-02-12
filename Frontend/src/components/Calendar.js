@@ -5,7 +5,7 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 const localizer = momentLocalizer(moment);
 
-const Calendar = ({ assignments, calendarEvents = [], courses = [], darkMode }) => {
+const Calendar = ({ assignments, calendarEvents = [], courses = [], classSchedule = [], darkMode }) => {
   // Convert assignments to calendar events
   const assignmentEvents = assignments
     .filter(a => a.due_at)
@@ -15,7 +15,7 @@ const Calendar = ({ assignments, calendarEvents = [], courses = [], darkMode }) 
       start: new Date(a.due_at),
       end: new Date(a.due_at),
       resource: { ...a, event_type: 'assignment' },
-      allDay: false
+      allDay: true
     }));
 
   // Convert Canvas calendar events (class times) to calendar events
@@ -55,8 +55,61 @@ const Calendar = ({ assignments, calendarEvents = [], courses = [], darkMode }) 
     }
   });
 
-  // Merge all event types
-  const events = [...assignmentEvents, ...classEvents, ...courseEvents];
+  // Generate recurring weekly events from class schedule
+  const scheduleEvents = [];
+  if (classSchedule.length > 0) {
+    // Generate events for ~20 weeks around today (covers a semester)
+    const today = new Date();
+    const semesterStart = new Date(today);
+    semesterStart.setDate(semesterStart.getDate() - 7 * 4); // 4 weeks back
+    const semesterEnd = new Date(today);
+    semesterEnd.setDate(semesterEnd.getDate() + 7 * 16); // 16 weeks forward
+
+    // day_of_week: 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri
+    // JS getDay(): 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+    const dayOfWeekToJS = [1, 2, 3, 4, 5]; // Mon=1, Tue=2, Wed=3, Thu=4, Fri=5
+
+    classSchedule.forEach((entry, ei) => {
+      const jsDay = dayOfWeekToJS[entry.day_of_week];
+      if (jsDay === undefined) return;
+
+      const [startH, startM] = entry.start_time.split(':').map(Number);
+      const [endH, endM] = entry.end_time.split(':').map(Number);
+
+      // Find the first matching weekday on or after semesterStart
+      const cursor = new Date(semesterStart);
+      while (cursor.getDay() !== jsDay) {
+        cursor.setDate(cursor.getDate() + 1);
+      }
+
+      // Create an event for each week
+      while (cursor <= semesterEnd) {
+        const start = new Date(cursor);
+        start.setHours(startH, startM, 0, 0);
+        const end = new Date(cursor);
+        end.setHours(endH, endM, 0, 0);
+
+        scheduleEvents.push({
+          id: `schedule-${entry.course_id}-${entry.day_of_week}-${cursor.getTime()}`,
+          title: entry.course_name,
+          start,
+          end,
+          resource: {
+            event_type: 'schedule',
+            course_name: entry.course_name,
+            location: entry.location,
+            color: entry.color
+          },
+          allDay: false
+        });
+
+        cursor.setDate(cursor.getDate() + 7);
+      }
+    });
+  }
+
+  // Unified events: assignments + class schedule + course markers
+  const events = [...assignmentEvents, ...scheduleEvents, ...courseEvents];
 
   const eventStyleGetter = (event) => {
     // Course start/end markers
@@ -70,6 +123,20 @@ const Calendar = ({ assignments, calendarEvents = [], courses = [], darkMode }) 
           border: '0px',
           display: 'block',
           fontSize: '11px'
+        }
+      };
+    }
+
+    // Class schedule blocks — use the course's assigned color
+    if (event.resource.event_type === 'schedule') {
+      return {
+        style: {
+          backgroundColor: event.resource.color || '#3174ad',
+          borderRadius: '5px',
+          opacity: 1,
+          color: 'white',
+          border: '0px',
+          display: 'block'
         }
       };
     }
@@ -124,6 +191,7 @@ const Calendar = ({ assignments, calendarEvents = [], courses = [], darkMode }) 
       <strong>
         {event.resource.event_type === 'course' ? '📘 ' : ''}
         {event.resource.event_type === 'class_event' ? '🏫 ' : ''}
+        {event.resource.event_type === 'schedule' ? '📚 ' : ''}
         {event.title}
       </strong>
       {event.resource.event_type === 'assignment' && event.resource.points_possible && (
@@ -134,6 +202,11 @@ const Calendar = ({ assignments, calendarEvents = [], courses = [], darkMode }) 
       {event.resource.event_type === 'class_event' && event.resource.location_name && (
         <div style={{ fontSize: '11px' }}>
           📍 {event.resource.location_name}
+        </div>
+      )}
+      {event.resource.event_type === 'schedule' && event.resource.location && (
+        <div style={{ fontSize: '11px' }}>
+          📍 {event.resource.location}
         </div>
       )}
       {event.resource.event_type === 'course' && (
@@ -152,12 +225,29 @@ const Calendar = ({ assignments, calendarEvents = [], courses = [], darkMode }) 
     }}
       className={darkMode ? 'dark-calendar' : ''}
     >
+      <div style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '12px',
+        padding: '0 0 10px 0',
+        fontSize: '11px',
+        color: darkMode ? '#aaa' : '#666'
+      }}>
+        <span style={styles.legendItem}><span style={{ ...styles.legendDot, backgroundColor: '#d32f2f' }} />Overdue</span>
+        <span style={styles.legendItem}><span style={{ ...styles.legendDot, backgroundColor: '#f57c00' }} />Due Soon</span>
+        <span style={styles.legendItem}><span style={{ ...styles.legendDot, backgroundColor: '#fbc02d' }} />This Week</span>
+        <span style={styles.legendItem}><span style={{ ...styles.legendDot, backgroundColor: '#3174ad' }} />Upcoming</span>
+        <span style={styles.legendItem}><span style={{ ...styles.legendDot, backgroundColor: '#4caf50' }} />Completed</span>
+        <span style={{ ...styles.legendItem, borderLeft: darkMode ? '1px solid #444' : '1px solid #ddd', paddingLeft: '12px' }}>
+          <span style={{ ...styles.legendDot, backgroundColor: '#7c4dff' }} />Class Schedule
+        </span>
+      </div>
       <BigCalendar
         localizer={localizer}
         events={events}
         startAccessor="start"
         endAccessor="end"
-        style={{ height: '100%' }}
+        style={{ flex: 1 }}
         eventPropGetter={eventStyleGetter}
         components={{
           event: CustomEvent
@@ -165,6 +255,11 @@ const Calendar = ({ assignments, calendarEvents = [], courses = [], darkMode }) 
         views={['month', 'week', 'day', 'agenda']}
         defaultView="month"
         popup
+        onSelectEvent={(event) => {
+          if (event.resource.html_url) {
+            window.open(event.resource.html_url, '_blank', 'noopener,noreferrer');
+          }
+        }}
         tooltipAccessor={(event) => {
           if (event.resource.event_type === 'course') {
             const start = moment(event.start).format('MMM D, YYYY');
@@ -173,6 +268,11 @@ const Calendar = ({ assignments, calendarEvents = [], courses = [], darkMode }) 
           }
           if (event.resource.event_type === 'class_event') {
             return `${event.resource.context_name || ''}\n${event.resource.title}${event.resource.location_name ? '\n📍 ' + event.resource.location_name : ''}`;
+          }
+          if (event.resource.event_type === 'schedule') {
+            const startTime = moment(event.start).format('h:mm A');
+            const endTime = moment(event.end).format('h:mm A');
+            return `${event.resource.course_name}\n${startTime} - ${endTime}${event.resource.location ? '\n📍 ' + event.resource.location : ''}`;
           }
           return `${event.resource.course_name}\n${event.resource.title}\n${event.resource.points_possible || 0} points`;
         }}
@@ -190,7 +290,20 @@ const styles = {
     borderRadius: '16px',
     overflow: 'hidden',
     boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-    border: '1px solid #e0e0e0'
+    border: '1px solid #e0e0e0',
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  legendItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px'
+  },
+  legendDot: {
+    width: '10px',
+    height: '10px',
+    borderRadius: '3px',
+    display: 'inline-block'
   }
 };
 

@@ -54,6 +54,21 @@ export const getCourses = async (canvasToken) => {
  * @param {boolean} isCompleted - The new status
  * @param {string} canvasToken - Required to identify the specific user
  */
+export const getClassSchedule = async (canvasToken) => {
+  const response = await axios.get(`${API_BASE_URL}/schedule`, {
+    params: { canvas_token: canvasToken }
+  });
+  return response.data;
+};
+
+export const saveClassSchedule = async (canvasToken, entries) => {
+  const response = await axios.post(`${API_BASE_URL}/schedule`, {
+    canvas_token: canvasToken,
+    entries
+  });
+  return response.data;
+};
+
 export const toggleAssignmentCompletion = async (assignmentId, isCompleted, canvasToken) => {
   const response = await axios.patch(
     `${API_BASE_URL}/assignments/${assignmentId}/complete`,
