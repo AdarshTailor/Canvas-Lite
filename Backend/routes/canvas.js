@@ -3,6 +3,28 @@ const router = express.Router();
 const { authenticateUser } = require('../middleware/auth');
 const CanvasAPI = require('../services/canvasAPI');
 
+// Raw unfiltered courses straight from Canvas — for demo/debugging
+router.get('/raw-courses', authenticateUser, async (req, res) => {
+  try {
+    if (!req.user) return res.status(404).json({ detail: 'User not found' });
+    const axios = require('axios');
+    const response = await axios.get(`${req.user.canvas_url}/api/v1/courses`, {
+      headers: { Authorization: `Bearer ${req.canvasToken}` },
+      params: { enrollment_state: 'active', per_page: 100, 'include[]': 'term' },
+      timeout: 10000
+    });
+    res.json(response.data.map(c => ({
+      id: c.id,
+      name: c.name,
+      term: c.term?.name || null,
+      start_at: c.start_at,
+      end_at: c.end_at
+    })));
+  } catch (error) {
+    res.status(500).json({ detail: error.message });
+  }
+});
+
 // Get active courses from Canvas
 router.get('/courses', authenticateUser, async (req, res) => {
   try {
