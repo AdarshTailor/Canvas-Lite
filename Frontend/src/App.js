@@ -25,6 +25,20 @@ function App() {
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem('dark_mode') === 'true';
   });
+  const [hiddenCourses, setHiddenCourses] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('hidden_courses') || '[]'); }
+    catch { return []; }
+  });
+
+  const toggleCourseVisibility = (courseName) => {
+    setHiddenCourses(prev => {
+      const next = prev.includes(courseName)
+        ? prev.filter(c => c !== courseName)
+        : [...prev, courseName];
+      localStorage.setItem('hidden_courses', JSON.stringify(next));
+      return next;
+    });
+  };
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type, show: true });
@@ -326,7 +340,7 @@ function App() {
             </div>
           </div>
         ) : (
-          <Calendar assignments={activeAssignments} calendarEvents={calendarEvents} courses={courses} classSchedule={classSchedule} darkMode={darkMode} />
+          <Calendar assignments={activeAssignments} calendarEvents={calendarEvents} courses={courses} classSchedule={classSchedule} darkMode={darkMode} hiddenCourses={hiddenCourses} />
         )}
       </div>
 
@@ -353,6 +367,8 @@ function App() {
         onSave={() => loadClassSchedule(credentials.canvasToken)}
         onError={showToast}
         darkMode={darkMode}
+        hiddenCourses={hiddenCourses}
+        onToggleCourse={toggleCourseVisibility}
       />
 
       <TokenModal

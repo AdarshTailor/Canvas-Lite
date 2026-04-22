@@ -4,7 +4,7 @@ import { saveClassSchedule } from '../services/api';
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 const COLORS = ['#e53935', '#1e88e5', '#43a047', '#fb8c00', '#8e24aa', '#00acc1', '#6d4c41', '#546e7a'];
 
-const ScheduleEditor = ({ isOpen, onClose, courses, existingSchedule, onSave, onError, darkMode }) => {
+const ScheduleEditor = ({ isOpen, onClose, courses, existingSchedule, onSave, onError, darkMode, hiddenCourses = [], onToggleCourse }) => {
   const [courseEntries, setCourseEntries] = useState([]);
   const [saving, setSaving] = useState(false);
   const initialized = useRef(false);
@@ -125,8 +125,10 @@ const ScheduleEditor = ({ isOpen, onClose, courses, existingSchedule, onSave, on
         </div>
 
         <div style={styles.body}>
-          {courseEntries.map((course, ci) => (
-            <div key={course.course_id} style={{ ...styles.courseCard, backgroundColor: cardBg, borderLeft: `4px solid ${course.color}` }}>
+          {courseEntries.map((course, ci) => {
+            const isHidden = hiddenCourses.includes(course.course_name);
+            return (
+            <div key={course.course_id} style={{ ...styles.courseCard, backgroundColor: cardBg, borderLeft: `4px solid ${course.color}`, opacity: isHidden ? 0.45 : 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                 <div style={{ display: 'flex', gap: '5px', flexShrink: 0 }}>
                   {COLORS.map(c => (
@@ -143,7 +145,14 @@ const ScheduleEditor = ({ isOpen, onClose, courses, existingSchedule, onSave, on
                     />
                   ))}
                 </div>
-                <div style={{ ...styles.courseName, marginBottom: 0, color: text }}>{course.course_name}</div>
+                <div style={{ ...styles.courseName, marginBottom: 0, color: text, flex: 1 }}>{course.course_name}</div>
+                <button
+                  onClick={() => onToggleCourse && onToggleCourse(course.course_name)}
+                  title={isHidden ? 'Show on calendar' : 'Hide from calendar'}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', padding: '2px 4px', opacity: 0.7 }}
+                >
+                  {isHidden ? '🙈' : '👁'}
+                </button>
               </div>
 
               <div style={styles.daysRow}>
@@ -193,7 +202,8 @@ const ScheduleEditor = ({ isOpen, onClose, courses, existingSchedule, onSave, on
                 </label>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         <div style={{ ...styles.footer, borderTop: `1px solid ${border}` }}>

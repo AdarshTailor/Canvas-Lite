@@ -24,10 +24,10 @@ const getCourseColor = (courseName, classSchedule) => {
   return entry?.color || hashColor(courseName || '');
 };
 
-const Calendar = ({ assignments, calendarEvents = [], courses = [], classSchedule = [], darkMode }) => {
+const Calendar = ({ assignments, calendarEvents = [], courses = [], classSchedule = [], darkMode, hiddenCourses = [] }) => {
   // Convert assignments to calendar events — colored by course
   const assignmentEvents = assignments
-    .filter(a => a.due_at)
+    .filter(a => a.due_at && !hiddenCourses.includes(a.course_name))
     .map(a => ({
       id: `assignment-${a.id}`,
       title: a.title,
@@ -91,6 +91,7 @@ const Calendar = ({ assignments, calendarEvents = [], courses = [], classSchedul
     // Guard against duplicate DB entries for the same course+day
     const seenKeys = new Set();
     const uniqueSchedule = classSchedule.filter(entry => {
+      if (hiddenCourses.includes(entry.course_name)) return false;
       const key = `${entry.course_id}-${entry.course_name}-${entry.day_of_week}`;
       if (seenKeys.has(key)) return false;
       seenKeys.add(key);
