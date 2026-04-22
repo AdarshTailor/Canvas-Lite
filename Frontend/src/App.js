@@ -162,8 +162,10 @@ function App() {
     ]).finally(() => setIsLoading(false));
   };
 
-  // getCourses already filters to current semester, so all synced assignments are current
-  const activeAssignments = assignments;
+  // Filter out assignments from courses the user has explicitly hidden
+  const activeAssignments = hiddenCourses.length > 0
+    ? assignments.filter(a => !hiddenCourses.includes(a.course_name))
+    : assignments;
 
 
   const handleDisconnect = () => {
