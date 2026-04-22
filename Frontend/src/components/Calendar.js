@@ -5,16 +5,35 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 const localizer = momentLocalizer(moment);
 
+const PALETTE = ['#e53935','#1e88e5','#43a047','#fb8c00','#8e24aa','#00acc1','#6d4c41','#546e7a','#d81b60','#3949ab','#00897b','#f4511e'];
+
+const hashColor = (str) => {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h);
+  return PALETTE[Math.abs(h) % PALETTE.length];
+};
+
+const shortCode = (name) => {
+  if (!name) return '';
+  const m = name.match(/[A-Z]{2,4}-\d{4}/);
+  return m ? m[0].replace('-', ' ') : name.split(' ').slice(0, 2).join(' ');
+};
+
+const getCourseColor = (courseName, classSchedule) => {
+  const entry = classSchedule.find(e => e.course_name === courseName);
+  return entry?.color || hashColor(courseName || '');
+};
+
 const Calendar = ({ assignments, calendarEvents = [], courses = [], classSchedule = [], darkMode }) => {
-  // Convert assignments to calendar events
+  // Convert assignments to calendar events — colored by course
   const assignmentEvents = assignments
     .filter(a => a.due_at)
     .map(a => ({
       id: `assignment-${a.id}`,
-      title: `${a.course_name}: ${a.title}`,
+      title: a.title,
       start: new Date(a.due_at),
       end: new Date(a.due_at),
-      resource: { ...a, event_type: 'assignment' },
+      resource: { ...a, event_type: 'assignment', courseColor: getCourseColor(a.course_name, classSchedule) },
       allDay: true
     }));
 
@@ -164,67 +183,72 @@ const Calendar = ({ assignments, calendarEvents = [], courses = [], classSchedul
       };
     }
 
-    // Assignment styling (existing logic)
+    // Assignment: background = course color, left border = urgency
     const isCompleted = event.resource.is_completed;
-    const dueDate = moment(event.start);
-    const now = moment();
-    const daysUntilDue = dueDate.diff(now, 'days');
+    const daysUntilDue = moment(event.start).diff(moment(), 'days');
+    const courseColor = event.resource.courseColor || '#3174ad';
 
-    let backgroundColor = '#3174ad'; // Default blue
-
-    if (isCompleted) {
-      backgroundColor = '#4caf50'; // Green for completed
-    } else if (daysUntilDue < 0) {
-      backgroundColor = '#d32f2f'; // Red for overdue
-    } else if (daysUntilDue <= 2) {
-      backgroundColor = '#f57c00'; // Orange for due soon
-    } else if (daysUntilDue <= 7) {
-      backgroundColor = '#fbc02d'; // Yellow for due this week
-    }
+    let urgencyBorder = 'transparent';
+    if (isCompleted) urgencyBorder = '#4caf50';
+    else if (daysUntilDue < 0) urgencyBorder = '#d32f2f';
+    else if (daysUntilDue <= 2) urgencyBorder = '#ff7043';
+    else if (daysUntilDue <= 7) urgencyBorder = '#ffd54f';
 
     return {
       style: {
-        backgroundColor,
+        backgroundColor: courseColor,
         borderRadius: '5px',
-        opacity: isCompleted ? 0.6 : 1,
+        opacity: isCompleted ? 0.5 : 1,
         color: 'white',
-        border: '0px',
+        border: 'none',
+        borderLeft: `4px solid ${urgencyBorder}`,
         display: 'block',
         textDecoration: isCompleted ? 'line-through' : 'none'
       }
     };
   };
 
-  const CustomEvent = ({ event }) => (
-    <div style={{ fontSize: '12px', padding: '2px' }}>
-      <strong>
-        {event.resource.event_type === 'course' ? '📘 ' : ''}
-        {event.resource.event_type === 'class_event' ? '🏫 ' : ''}
-        {event.resource.event_type === 'schedule' ? '📚 ' : ''}
-        {event.title}
-      </strong>
-      {event.resource.event_type === 'assignment' && event.resource.points_possible && (
-        <div style={{ fontSize: '11px' }}>
-          {event.resource.points_possible} pts
+  const CustomEvent = ({ event }) => {
+    if (event.resource.event_type === 'assignment') {
+      const daysUntilDue = moment(event.start).diff(moment(), 'days');
+      let urgencyLabel = null;
+      if (event.resource.is_completed) urgencyLabel = null;
+      else if (daysUntilDue < 0) urgencyLabel = <span style={{ fontSize: '10px', opacity: 0.9 }}>⚠ Overdue</span>;
+      else if (daysUntilDue === 0) urgencyLabel = <span style={{ fontSize: '10px', opacity: 0.9 }}>Due today</span>;
+      else if (daysUntilDue <= 2) urgencyLabel = <span style={{ fontSize: '10px', opacity: 0.9 }}>Due soon</span>;
+
+      return (
+        <div style={{ fontSize: '12px', padding: '2px 3px' }}>
+          <div style={{ fontSize: '10px', fontWeight: '700', opacity: 0.85, letterSpacing: '0.3px' }}>
+            {shortCode(event.resource.course_name)}
+          </div>
+          <div style={{ fontWeight: '600', lineHeight: 1.2 }}>{event.title}</div>
+          {urgencyLabel}
         </div>
-      )}
-      {event.resource.event_type === 'class_event' && event.resource.location_name && (
-        <div style={{ fontSize: '11px' }}>
-          📍 {event.resource.location_name}
-        </div>
-      )}
-      {event.resource.event_type === 'schedule' && event.resource.location && (
-        <div style={{ fontSize: '11px' }}>
-          📍 {event.resource.location}
-        </div>
-      )}
-      {event.resource.event_type === 'course' && (
-        <div style={{ fontSize: '11px' }}>
-          {event.resource.course_code || ''} {event.resource.marker === 'start' ? '▶' : '◼'}
-        </div>
-      )}
-    </div>
-  );
+      );
+    }
+
+    return (
+      <div style={{ fontSize: '12px', padding: '2px' }}>
+        <strong>
+          {event.resource.event_type === 'course' ? '📘 ' : ''}
+          {event.resource.event_type === 'class_event' ? '🏫 ' : ''}
+          {event.title}
+        </strong>
+        {event.resource.event_type === 'class_event' && event.resource.location_name && (
+          <div style={{ fontSize: '11px' }}>📍 {event.resource.location_name}</div>
+        )}
+        {event.resource.event_type === 'schedule' && event.resource.location && (
+          <div style={{ fontSize: '11px' }}>📍 {event.resource.location}</div>
+        )}
+        {event.resource.event_type === 'course' && (
+          <div style={{ fontSize: '11px' }}>
+            {event.resource.course_code || ''} {event.resource.marker === 'start' ? '▶' : '◼'}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div style={{
@@ -242,14 +266,15 @@ const Calendar = ({ assignments, calendarEvents = [], courses = [], classSchedul
         fontSize: '11px',
         color: darkMode ? '#aaa' : '#666'
       }}>
-        <span style={styles.legendItem}><span style={{ ...styles.legendDot, backgroundColor: '#d32f2f' }} />Overdue</span>
-        <span style={styles.legendItem}><span style={{ ...styles.legendDot, backgroundColor: '#f57c00' }} />Due Soon</span>
-        <span style={styles.legendItem}><span style={{ ...styles.legendDot, backgroundColor: '#fbc02d' }} />This Week</span>
-        <span style={styles.legendItem}><span style={{ ...styles.legendDot, backgroundColor: '#3174ad' }} />Upcoming</span>
-        <span style={styles.legendItem}><span style={{ ...styles.legendDot, backgroundColor: '#4caf50' }} />Completed</span>
+        <span style={styles.legendItem}><span style={{ ...styles.legendDot, backgroundColor: '#888', position: 'relative', overflow: 'hidden' }}><span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', backgroundColor: '#d32f2f' }} /></span>Overdue</span>
+        <span style={styles.legendItem}><span style={{ ...styles.legendDot, backgroundColor: '#888', position: 'relative', overflow: 'hidden' }}><span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', backgroundColor: '#ff7043' }} /></span>Due Soon</span>
+        <span style={styles.legendItem}><span style={{ ...styles.legendDot, backgroundColor: '#888', position: 'relative', overflow: 'hidden' }}><span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', backgroundColor: '#ffd54f' }} /></span>This Week</span>
+        <span style={styles.legendItem}><span style={{ ...styles.legendDot, backgroundColor: '#888' }} />Upcoming</span>
+        <span style={styles.legendItem}><span style={{ ...styles.legendDot, backgroundColor: '#888', opacity: 0.5 }} />Completed</span>
         <span style={{ ...styles.legendItem, borderLeft: darkMode ? '1px solid #444' : '1px solid #ddd', paddingLeft: '12px' }}>
           <span style={{ ...styles.legendDot, backgroundColor: '#7c4dff' }} />Class Schedule
         </span>
+        <span style={{ ...styles.legendItem, fontStyle: 'italic', opacity: 0.7 }}>Color = course</span>
       </div>
       <BigCalendar
         localizer={localizer}
