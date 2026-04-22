@@ -30,14 +30,15 @@ const ScheduleEditor = ({ isOpen, onClose, courses, existingSchedule, onSave, da
       });
     }
 
-    // Merge: use saved data if it exists, otherwise initialize empty
+    // Merge: use saved data if it exists, but always use the current Canvas course name
     setCourseEntries(
       courses.map((course, i) => {
         const key = String(course.id);
-        if (saved[key]) return saved[key];
+        const currentName = course.name || 'Unknown Course';
+        if (saved[key]) return { ...saved[key], course_name: currentName };
         return {
           course_id: key,
-          course_name: course.name || 'Unknown Course',
+          course_name: currentName,
           days: [],
           start_time: '09:00',
           end_time: '09:50',
@@ -107,7 +108,7 @@ const ScheduleEditor = ({ isOpen, onClose, courses, existingSchedule, onSave, da
       <div style={{ ...styles.modal, backgroundColor: bg, border: `1px solid ${border}` }} onClick={e => e.stopPropagation()}>
         <div style={{ ...styles.header, borderBottom: `2px solid ${border}` }}>
           <h2 style={{ ...styles.title, color: text }}>Edit Class Schedule</h2>
-          <button onClick={onClose} style={{ ...styles.closeBtn, color: subtext }}>X</button>
+          <button onClick={onClose} style={{ ...styles.closeBtn, color: subtext }}>×</button>
         </div>
 
         <div style={styles.body}>

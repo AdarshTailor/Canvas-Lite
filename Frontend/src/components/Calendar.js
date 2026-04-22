@@ -69,7 +69,16 @@ const Calendar = ({ assignments, calendarEvents = [], courses = [], classSchedul
     // JS getDay(): 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
     const dayOfWeekToJS = [1, 2, 3, 4, 5]; // Mon=1, Tue=2, Wed=3, Thu=4, Fri=5
 
-    classSchedule.forEach((entry, ei) => {
+    // Guard against duplicate DB entries for the same course+day
+    const seenKeys = new Set();
+    const uniqueSchedule = classSchedule.filter(entry => {
+      const key = `${entry.course_id}-${entry.day_of_week}`;
+      if (seenKeys.has(key)) return false;
+      seenKeys.add(key);
+      return true;
+    });
+
+    uniqueSchedule.forEach((entry, ei) => {
       const jsDay = dayOfWeekToJS[entry.day_of_week];
       if (jsDay === undefined) return;
 
