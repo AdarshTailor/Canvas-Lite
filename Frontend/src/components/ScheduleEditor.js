@@ -20,12 +20,13 @@ const ScheduleEditor = ({ isOpen, onClose, courses, existingSchedule, onSave, on
 
     initialized.current = true;
 
-    // Group any existing saved entries by course_id
+    // Group saved entries by course_id+name — two courses can share a Canvas ID
     const saved = {};
     if (existingSchedule && existingSchedule.length > 0) {
       existingSchedule.forEach(entry => {
-        if (!saved[entry.course_id]) {
-          saved[entry.course_id] = {
+        const k = `${entry.course_id}||${entry.course_name}`;
+        if (!saved[k]) {
+          saved[k] = {
             course_id: String(entry.course_id),
             course_name: entry.course_name,
             days: [],
@@ -35,15 +36,17 @@ const ScheduleEditor = ({ isOpen, onClose, courses, existingSchedule, onSave, on
             color: entry.color
           };
         }
-        saved[entry.course_id].days.push(entry.day_of_week);
+        if (!saved[k].days.includes(entry.day_of_week)) {
+          saved[k].days.push(entry.day_of_week);
+        }
       });
     }
 
     // Merge: use saved data if it exists, but always use the current Canvas course name
     setCourseEntries(
       courses.map((course, i) => {
-        const key = String(course.id);
         const currentName = course.name || 'Unknown Course';
+        const key = `${String(course.id)}||${currentName}`;
         if (saved[key]) return { ...saved[key], course_name: currentName };
         return {
           course_id: key,

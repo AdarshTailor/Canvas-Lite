@@ -72,7 +72,7 @@ const Calendar = ({ assignments, calendarEvents = [], courses = [], classSchedul
     // Guard against duplicate DB entries for the same course+day
     const seenKeys = new Set();
     const uniqueSchedule = classSchedule.filter(entry => {
-      const key = `${entry.course_id}-${entry.day_of_week}`;
+      const key = `${entry.course_id}-${entry.course_name}-${entry.day_of_week}`;
       if (seenKeys.has(key)) return false;
       seenKeys.add(key);
       return true;
@@ -99,7 +99,7 @@ const Calendar = ({ assignments, calendarEvents = [], courses = [], classSchedul
         end.setHours(endH, endM, 0, 0);
 
         scheduleEvents.push({
-          id: `schedule-${entry.course_id}-${entry.day_of_week}-${cursor.getTime()}`,
+          id: `schedule-${entry.course_id}-${entry.course_name}-${entry.day_of_week}-${cursor.getTime()}`,
           title: entry.course_name,
           start,
           end,
