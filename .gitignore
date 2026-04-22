@@ -1,0 +1,17 @@
+# Claude Code
+.claude/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+
+# Database
+*.db
+*.sqlite
+
+# OS
+.DS_Store
