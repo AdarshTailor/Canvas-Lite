@@ -2,13 +2,15 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import moment from 'moment';
 import { toggleAssignmentCompletion } from '../services/api';
 
-const TaskPanel = ({ assignments, onTaskUpdate, darkMode, side, onSideChange }) => {
+const TaskPanel = ({ assignments, onTaskUpdate, onError, darkMode, isLoading, side, onSideChange }) => {
   const panelRef = useRef(null);
   const dragOffset = useRef({ x: 0, y: 0 });
   const dragPositionRef = useRef(null);
 
   const [dragPosition, setDragPosition] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [hoveredCard, setHoveredCard] = useState(null);
+  const [togglingIds, setTogglingIds] = useState(new Set());
 
   const handleDragStart = useCallback((e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'A') return;
@@ -61,22 +63,22 @@ const TaskPanel = ({ assignments, onTaskUpdate, darkMode, side, onSideChange }) 
   }, [isDragging, onSideChange]);
 
   const handleToggleComplete = async (canvasId, currentStatus) => {
+    const token = localStorage.getItem('canvas_token');
+    if (!token || togglingIds.has(canvasId)) return;
+
+    setTogglingIds(prev => new Set([...prev, canvasId]));
     try {
-      // 1. Get the token from storage
-      const token = localStorage.getItem('canvas_token'); 
-
-      if (!token) {
-        console.error("No token found. Please log in.");
-        return;
-      }
-
-      // 2. Pass the canvasId and token to the API
       await toggleAssignmentCompletion(canvasId, !currentStatus, token);
-      
-      // 3. Trigger parent refresh
-      onTaskUpdate(); 
+      onTaskUpdate();
     } catch (err) {
       console.error('Error toggling completion:', err);
+      if (onError) onError('Could not save — please try again', 'error');
+    } finally {
+      setTogglingIds(prev => {
+        const next = new Set(prev);
+        next.delete(canvasId);
+        return next;
+      });
     }
   };
 
@@ -197,21 +199,42 @@ const TaskPanel = ({ assignments, onTaskUpdate, darkMode, side, onSideChange }) 
 
       <div style={styles.content}>
         <h3 style={{...styles.sectionTitle, color: darkMode ? '#a0a0a0' : '#666'}}>Upcoming</h3>
-        {upcomingAssignments.length === 0 ? (
+        {isLoading ? (
+          [1, 2, 3].map(i => (
+            <div key={i} style={{
+              ...styles.taskCard,
+              backgroundColor: darkMode ? '#252540' : '#f0f0f0',
+              border: darkMode ? '1px solid #333' : '1px solid #e0e0e0',
+            }}>
+              <div style={{ height: '14px', borderRadius: '4px', backgroundColor: darkMode ? '#333' : '#ddd', marginBottom: '10px', width: '75%', animation: 'pulse 1.4s ease-in-out infinite' }} />
+              <div style={{ height: '11px', borderRadius: '4px', backgroundColor: darkMode ? '#2a2a45' : '#e5e5e5', width: '45%', animation: 'pulse 1.4s ease-in-out infinite' }} />
+            </div>
+          ))
+        ) : upcomingAssignments.length === 0 ? (
           <p style={styles.emptyState}>No upcoming assignments! 🎉</p>
         ) : (
           upcomingAssignments.map(assignment => (
-            <div key={assignment.canvas_id} style={{
+            <div
+              key={assignment.canvas_id}
+              onMouseEnter={() => setHoveredCard(assignment.canvas_id)}
+              onMouseLeave={() => setHoveredCard(null)}
+              style={{
               ...styles.taskCard,
               backgroundColor: darkMode ? '#252540' : '#f8f9fa',
-              border: darkMode ? '1px solid #333' : '1px solid #e0e0e0'
+              border: darkMode ? '1px solid #333' : '1px solid #e0e0e0',
+              transform: hoveredCard === assignment.canvas_id ? 'translateY(-2px)' : 'translateY(0)',
+              boxShadow: hoveredCard === assignment.canvas_id
+                ? (darkMode ? '0 4px 12px rgba(0,0,0,0.4)' : '0 4px 12px rgba(0,0,0,0.1)')
+                : 'none',
+              opacity: togglingIds.has(assignment.canvas_id) ? 0.6 : 1,
             }}>
               <div style={styles.taskHeader}>
                 <input
                   type="checkbox"
                   checked={assignment.is_completed}
+                  disabled={togglingIds.has(assignment.canvas_id)}
                   onChange={() => handleToggleComplete(assignment.canvas_id, assignment.is_completed)}
-                  style={styles.checkbox}
+                  style={{ ...styles.checkbox, cursor: togglingIds.has(assignment.canvas_id) ? 'wait' : 'pointer' }}
                 />
                 <div style={styles.taskInfo}>
                   <h4 style={{...styles.taskTitle, color: darkMode ? '#e0e0e0' : '#333'}}>{assignment.title}</h4>

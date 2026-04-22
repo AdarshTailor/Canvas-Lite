@@ -16,12 +16,20 @@ function App() {
   const [classSchedule, setClassSchedule] = useState([]);
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [showScheduleEditor, setShowScheduleEditor] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [syncSuccess, setSyncSuccess] = useState(false);
+  const [toast, setToast] = useState({ message: '', type: 'success', show: false });
   const [panelSide, setPanelSide] = useState(() => {
     return localStorage.getItem('taskPanelSide') || 'right';
   });
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem('dark_mode') === 'true';
   });
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type, show: true });
+    setTimeout(() => setToast(t => ({ ...t, show: false })), 3000);
+  };
 
   const toggleDarkMode = () => {
     setDarkMode(prev => {
@@ -37,11 +45,14 @@ function App() {
     if (storedUrl && storedToken) {
       setCredentials({ canvasUrl: storedUrl, canvasToken: storedToken });
       setAuthenticated(true);
-      loadAssignments(storedToken);
-      loadCourses(storedToken);
-      loadClassSchedule(storedToken);
-      loadCalendarEvents(storedToken);
-      loadSyncStatus(storedToken);
+      setIsLoading(true);
+      Promise.all([
+        loadAssignments(storedToken),
+        loadCourses(storedToken),
+        loadClassSchedule(storedToken),
+        loadCalendarEvents(storedToken),
+        loadSyncStatus(storedToken),
+      ]).finally(() => setIsLoading(false));
     }
   }, []);
 
@@ -107,12 +118,18 @@ function App() {
     try {
       const result = await syncAssignments(credentials.canvasUrl, credentials.canvasToken);
       setLastSync(result.last_sync);
-      await loadAssignments(credentials.canvasToken);
-      await loadCourses(credentials.canvasToken);
-      await loadClassSchedule(credentials.canvasToken);
-      await loadCalendarEvents(credentials.canvasToken);
+      await Promise.all([
+        loadAssignments(credentials.canvasToken),
+        loadCourses(credentials.canvasToken),
+        loadClassSchedule(credentials.canvasToken),
+        loadCalendarEvents(credentials.canvasToken),
+      ]);
+      setSyncSuccess(true);
+      showToast('Synced successfully');
+      setTimeout(() => setSyncSuccess(false), 2000);
     } catch (err) {
       console.error('Error syncing:', err);
+      showToast('Sync failed — check your connection', 'error');
     } finally {
       setSyncing(false);
     }
@@ -121,11 +138,14 @@ function App() {
   const handleTokenValidated = (creds) => {
     setCredentials(creds);
     setAuthenticated(true);
-    loadAssignments(creds.canvasToken);
-    loadCourses(creds.canvasToken);
-    loadClassSchedule(creds.canvasToken);
-    loadCalendarEvents(creds.canvasToken);
-    loadSyncStatus(creds.canvasToken);
+    setIsLoading(true);
+    Promise.all([
+      loadAssignments(creds.canvasToken),
+      loadCourses(creds.canvasToken),
+      loadClassSchedule(creds.canvasToken),
+      loadCalendarEvents(creds.canvasToken),
+      loadSyncStatus(creds.canvasToken),
+    ]).finally(() => setIsLoading(false));
   };
 
   // Only show assignments from currently active courses
@@ -134,6 +154,7 @@ function App() {
     const activeCourseIds = new Set(courses.map(c => String(c.id)));
     return assignments.filter(a => activeCourseIds.has(String(a.course_id)));
   }, [assignments, courses]);
+
 
   const handleDisconnect = () => {
     if (window.confirm('Are you sure you want to disconnect from Canvas?')) {
@@ -149,8 +170,28 @@ function App() {
 
   return (
     <div style={{...styles.app, backgroundColor: darkMode ? '#121212' : '#fff'}}>
+      {toast.show && (
+        <div style={{
+          position: 'fixed',
+          top: '70px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          backgroundColor: toast.type === 'success' ? '#28a745' : '#dc3545',
+          color: 'white',
+          padding: '10px 24px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+          zIndex: 9999,
+          fontSize: '14px',
+          fontWeight: '500',
+          pointerEvents: 'none',
+        }}>
+          {toast.type === 'success' ? '✓ ' : '✗ '}{toast.message}
+        </div>
+      )}
+
       <div style={{...styles.header, backgroundColor: darkMode ? '#1a1a2e' : '#007bff'}}>
-        <h1 style={styles.title}>Canvas-Lite</h1>
+        <h1 style={styles.title}>📅 Canvas-Lite</h1>
         
         <div style={styles.headerActions}>
           <div
@@ -172,14 +213,23 @@ function App() {
 
           {authenticated && (
             <>
-              <button
-                onClick={handleSync}
-                disabled={syncing}
-                style={styles.syncButton}
-                title={lastSync ? `Last synced ${new Date(lastSync).toLocaleTimeString()}` : 'Never synced'}
-              >
-                {syncing ? 'Syncing...' : 'Sync'}
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                <button
+                  onClick={handleSync}
+                  disabled={syncing}
+                  style={{
+                    ...styles.syncButton,
+                    backgroundColor: syncSuccess ? 'rgba(40,167,69,0.35)' : 'rgba(255,255,255,0.2)',
+                  }}
+                >
+                  {syncing ? 'Syncing...' : syncSuccess ? '✓ Synced' : 'Sync'}
+                </button>
+                {lastSync && (
+                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.65)', letterSpacing: '0.2px' }}>
+                    {new Date(lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </div>
               <button
                 onClick={() => setShowScheduleEditor(true)}
                 style={styles.syncButton}
@@ -198,13 +248,12 @@ function App() {
           )}
           
           {!authenticated && (
-            <button 
-              onClick={() => setShowTokenModal(true)} 
+            <button
+              onClick={() => setShowTokenModal(true)}
               style={styles.connectButton}
-              className="pulsate"
               title="Connect to Canvas"
             >
-            Connect Your Canvas
+              Connect Canvas
             </button>
           )}
         </div>
@@ -216,13 +265,66 @@ function App() {
         marginRight: authenticated && panelSide === 'right' ? '380px' : '0'
       }}>
         {!authenticated ? (
-          <div style={{...styles.emptyState, backgroundColor: darkMode ? '#1e1e2e' : '#f8f9fa'}}>
+          <div style={{
+            ...styles.emptyState,
+            background: darkMode ? '#1e1e2e' : 'linear-gradient(145deg, #eef3ff 0%, #f9fafb 60%)',
+          }}>
             <div style={styles.emptyStateContent}>
-              <h2 style={{...styles.emptyStateTitle, color: darkMode ? '#e0e0e0' : '#333'}}>Welcome to Canvas Lite! 👋</h2>
-              <p style={{...styles.emptyStateText, color: darkMode ? '#a0a0a0' : '#666'}}>
-                Click the pulsating "Connect Canvas" button above to get started.
+
+              {/* Logo row */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '28px' }}>
+                <div style={{ width: '42px', height: '42px', backgroundColor: '#007bff', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>📅</div>
+                <span style={{ fontSize: '26px', fontWeight: '700', color: darkMode ? '#e0e0e0' : '#1a1a2e', letterSpacing: '-0.5px' }}>Canvas-Lite</span>
+              </div>
+
+              {/* Headline */}
+              <h1 style={{ fontSize: '44px', fontWeight: '800', lineHeight: 1.15, letterSpacing: '-1.5px', margin: '0 0 18px 0', color: darkMode ? '#e0e0e0' : '#111' }}>
+                Your semester,<br />
+                <span style={{ color: '#007bff' }}>under control.</span>
+              </h1>
+
+              <p style={{ fontSize: '16px', color: darkMode ? '#a0a0a0' : '#555', marginBottom: '32px', lineHeight: 1.65, maxWidth: '360px', margin: '0 auto 32px' }}>
+                Sync your Canvas assignments, track deadlines on a visual calendar, and never miss a due date.
               </p>
-              <div style={styles.emptyStateIcon}>📅</div>
+
+              {/* Feature pills */}
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '36px' }}>
+                {['📆 Calendar view', '✅ Task tracking', '🔄 Auto-sync'].map(label => (
+                  <span key={label} style={{
+                    padding: '6px 14px',
+                    backgroundColor: darkMode ? '#252540' : 'white',
+                    border: darkMode ? '1px solid #333' : '1px solid #dee2e6',
+                    borderRadius: '20px',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: darkMode ? '#c0c0c0' : '#444',
+                  }}>{label}</span>
+                ))}
+              </div>
+
+              {/* CTA */}
+              <button
+                onClick={() => setShowTokenModal(true)}
+                style={{
+                  padding: '13px 32px',
+                  backgroundColor: '#007bff',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 20px rgba(0,123,255,0.3)',
+                  display: 'block',
+                  margin: '0 auto',
+                }}
+              >
+                Connect Canvas →
+              </button>
+              <p style={{ fontSize: '12px', color: darkMode ? '#555' : '#aaa', marginTop: '14px' }}>
+                Uses your existing Canvas account — no sign-up needed
+              </p>
+
             </div>
           </div>
         ) : (
@@ -234,7 +336,9 @@ function App() {
         <TaskPanel
           assignments={activeAssignments}
           onTaskUpdate={() => loadAssignments(credentials.canvasToken)}
+          onError={showToast}
           darkMode={darkMode}
+          isLoading={isLoading}
           side={panelSide}
           onSideChange={(newSide) => {
             setPanelSide(newSide);

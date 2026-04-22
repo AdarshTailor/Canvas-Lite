@@ -145,7 +145,7 @@ const styles = {
   },
   modal: {
     backgroundColor: 'white',
-    borderRadius: '8px',
+    borderRadius: '16px',
     width: '90%',
     maxWidth: '500px',
     maxHeight: '90vh',
