@@ -172,13 +172,15 @@ function App() {
 
   const handleDisconnect = () => {
     if (window.confirm('Are you sure you want to disconnect from Canvas?')) {
-      localStorage.removeItem('canvas_url');
-      localStorage.removeItem('canvas_token');
+      ['canvas_url', 'canvas_token', 'hidden_courses', 'dark_mode', 'taskPanelSide'].forEach(k => localStorage.removeItem(k));
       setAuthenticated(false);
       setCredentials(null);
       setAssignments([]);
       setCourses([]);
+      setClassSchedule([]);
       setLastSync(null);
+      setHiddenCourses([]);
+      setDarkMode(false);
     }
   };
 
