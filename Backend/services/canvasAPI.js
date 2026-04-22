@@ -109,7 +109,8 @@ class CanvasAPI {
       );
       return response.data;
     } catch (error) {
-      if (error.response?.status !== 403) {
+      const status = error.response?.status;
+      if (status !== 403 && status !== 404) {
         console.error(`Error fetching assignments for course ${courseId}:`, error.message);
       }
       return [];
