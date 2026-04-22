@@ -124,7 +124,24 @@ const ScheduleEditor = ({ isOpen, onClose, courses, existingSchedule, onSave, on
         <div style={styles.body}>
           {courseEntries.map((course, ci) => (
             <div key={course.course_id} style={{ ...styles.courseCard, backgroundColor: cardBg, borderLeft: `4px solid ${course.color}` }}>
-              <div style={{ ...styles.courseName, color: text }}>{course.course_name}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', gap: '5px', flexShrink: 0 }}>
+                  {COLORS.map(c => (
+                    <button
+                      key={c}
+                      onClick={() => updateField(ci, 'color', c)}
+                      title={c}
+                      style={{
+                        width: '16px', height: '16px', borderRadius: '50%', border: 'none',
+                        backgroundColor: c, cursor: 'pointer', flexShrink: 0,
+                        outline: course.color === c ? '2px solid white' : 'none',
+                        boxShadow: course.color === c ? `0 0 0 3px ${c}` : 'none',
+                      }}
+                    />
+                  ))}
+                </div>
+                <div style={{ ...styles.courseName, marginBottom: 0, color: text }}>{course.course_name}</div>
+              </div>
 
               <div style={styles.daysRow}>
                 {DAYS.map((day, di) => (
