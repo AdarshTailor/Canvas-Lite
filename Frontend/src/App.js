@@ -162,10 +162,12 @@ function App() {
     ]).finally(() => setIsLoading(false));
   };
 
-  // Filter out assignments from courses the user has explicitly hidden
-  const activeAssignments = hiddenCourses.length > 0
-    ? assignments.filter(a => !hiddenCourses.includes(a.course_name))
-    : assignments;
+  // Only show assignments from courses Canvas currently returns, minus hidden ones
+  const activeCourseNames = new Set(courses.map(c => c.name));
+  const activeAssignments = assignments.filter(a =>
+    (activeCourseNames.size === 0 || activeCourseNames.has(a.course_name)) &&
+    !hiddenCourses.includes(a.course_name)
+  );
 
 
   const handleDisconnect = () => {
