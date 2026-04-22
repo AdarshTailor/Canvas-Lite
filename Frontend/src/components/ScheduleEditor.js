@@ -1,15 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { saveClassSchedule } from '../services/api';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 const COLORS = ['#e53935', '#1e88e5', '#43a047', '#fb8c00', '#8e24aa', '#00acc1', '#6d4c41', '#546e7a'];
 
-const ScheduleEditor = ({ isOpen, onClose, courses, existingSchedule, onSave, darkMode }) => {
+const ScheduleEditor = ({ isOpen, onClose, courses, existingSchedule, onSave, onError, darkMode }) => {
   const [courseEntries, setCourseEntries] = useState([]);
   const [saving, setSaving] = useState(false);
+  const initialized = useRef(false);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      initialized.current = false;
+      return;
+    }
+    // Only initialize once per open session — don't reset on prop changes while editing
+    if (initialized.current) return;
+    if (courses.length === 0) return; // wait for courses to load
+
+    initialized.current = true;
 
     // Group any existing saved entries by course_id
     const saved = {};
@@ -90,6 +99,7 @@ const ScheduleEditor = ({ isOpen, onClose, courses, existingSchedule, onSave, da
       onClose();
     } catch (err) {
       console.error('Error saving schedule:', err);
+      if (onError) onError('Could not save schedule — please try again', 'error');
     } finally {
       setSaving(false);
     }

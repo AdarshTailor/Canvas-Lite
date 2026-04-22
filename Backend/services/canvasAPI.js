@@ -88,8 +88,8 @@ class CanvasAPI {
           return false;
         }
 
-        // 5. No semester info, no dates — likely an advising shell, filter out
-        return false;
+        // 5. No semester info, no dates — trust enrollment_state: 'active' from Canvas
+        return true;
       });
     } catch (error) {
       console.error('Error fetching courses:', error.message);

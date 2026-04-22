@@ -191,25 +191,27 @@ function App() {
       )}
 
       <div style={{...styles.header, backgroundColor: darkMode ? '#1a1a2e' : '#007bff'}}>
-        <h1 style={styles.title}>📅 Canvas-Lite</h1>
-        
+        {authenticated && <h1 style={styles.title}>📅 Canvas-Lite</h1>}
+
         <div style={styles.headerActions}>
-          <div
-            onClick={toggleDarkMode}
-            style={styles.toggleContainer}
-            title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            <span style={styles.toggleLabel}>{darkMode ? '🌙' : '☀️'}</span>
-            <div style={{
-              ...styles.toggleTrack,
-              backgroundColor: darkMode ? '#64b5f6' : 'rgba(255,255,255,0.35)',
-            }}>
+          {authenticated && (
+            <div
+              onClick={toggleDarkMode}
+              style={styles.toggleContainer}
+              title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              <span style={styles.toggleLabel}>{darkMode ? '🌙' : '☀️'}</span>
               <div style={{
-                ...styles.toggleThumb,
-                transform: darkMode ? 'translateX(20px)' : 'translateX(0)',
-              }} />
+                ...styles.toggleTrack,
+                backgroundColor: darkMode ? '#64b5f6' : 'rgba(255,255,255,0.35)',
+              }}>
+                <div style={{
+                  ...styles.toggleThumb,
+                  transform: darkMode ? 'translateX(20px)' : 'translateX(0)',
+                }} />
+              </div>
             </div>
-          </div>
+          )}
 
           {authenticated && (
             <>
@@ -353,6 +355,7 @@ function App() {
         courses={courses}
         existingSchedule={classSchedule}
         onSave={() => loadClassSchedule(credentials.canvasToken)}
+        onError={showToast}
         darkMode={darkMode}
       />
 
