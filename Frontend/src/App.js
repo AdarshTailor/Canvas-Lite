@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import Calendar from './components/Calendar';
 import ScheduleEditor from './components/ScheduleEditor';
 import TaskPanel from './components/TaskPanel';
@@ -148,12 +148,8 @@ function App() {
     ]).finally(() => setIsLoading(false));
   };
 
-  // Only show assignments from currently active courses
-  const activeAssignments = useMemo(() => {
-    if (courses.length === 0) return assignments;
-    const activeCourseIds = new Set(courses.map(c => String(c.id)));
-    return assignments.filter(a => activeCourseIds.has(String(a.course_id)));
-  }, [assignments, courses]);
+  // getCourses already filters to current semester, so all synced assignments are current
+  const activeAssignments = assignments;
 
 
   const handleDisconnect = () => {
