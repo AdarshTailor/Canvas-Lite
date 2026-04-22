@@ -110,6 +110,11 @@ class CanvasAPI {
       return response.data;
     } catch (error) {
       const status = error.response?.status;
+      // Canvas returns global IDs (>1e11) that may fail in URL paths — retry with local ID
+      if (status === 404 && courseId > 1e11) {
+        const localId = Math.round(courseId % 1e11);
+        return this.getAssignments(localId);
+      }
       if (status !== 403 && status !== 404) {
         console.error(`Error fetching assignments for course ${courseId}:`, error.message);
       }
